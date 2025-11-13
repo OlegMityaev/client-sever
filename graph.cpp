@@ -1,4 +1,3 @@
-// graph.cpp
 // Реализация проверки графа и поиска кратчайшего пути.
 
 #include "graph.hpp"
@@ -15,7 +14,7 @@ namespace {
 constexpr uint16_t kMinVertices = 6;
 // Минимальное количество рёбер в графе согласно требованиям.
 constexpr uint16_t kMinEdges = 6;
-// Значение "бесконечности" для алгоритма кратчайшего пути (используется для недостижимых вершин).
+// Значение бесконечности для алгоритма кратчайшего пути (используется для недостижимых вершин).
 constexpr uint32_t kInfinity = std::numeric_limits<uint32_t>::max() / 4;
 
 // Внутренняя структура для представления ребра графа.
@@ -65,7 +64,7 @@ bool checkIncidenceMatrix(const GraphDefinition& graph, std::string& message) {
 
 // Сборка списка рёбер из матрицы инцидентности: преобразует матрицу в список рёбер (u, v, weight).
 // Для каждого столбца матрицы находит инцидентные вершины и создаёт соответствующее ребро.
-// Поддерживает петли (ребро, соединяющее вершину саму с собой).
+// Поддерживает петли
 // В случае ошибки записывает описание в параметр message и возвращает пустой список.
 std::vector<EdgeData> collectEdges(const GraphDefinition& definition, std::string& message) {
     std::vector<EdgeData> edges;
@@ -99,7 +98,6 @@ std::vector<EdgeData> collectEdges(const GraphDefinition& definition, std::strin
         }
 
         if (endpoints.size() == 1) {
-            // Петля: вершина соединена сама с собой.
             edges.push_back({endpoints[0], endpoints[0], weight});
         } else {
             edges.push_back({endpoints[0], endpoints[1], weight});
