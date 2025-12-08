@@ -10,12 +10,16 @@ namespace graph {
 
 namespace {
 
-// Минимальное количество вершин в графе согласно требованиям.
+// Минимальное количество вершин
 constexpr uint16_t kMinVertices = 6;
-// Минимальное количество рёбер в графе согласно требованиям.
+// Минимальное количество рёбер
 constexpr uint16_t kMinEdges = 6;
+// Максимальное количество вершин
+constexpr uint16_t kMaxVertices = 65536;
+// Максимальное количество рёбер
+constexpr uint16_t kMaxEdges = 65536;
 // Значение бесконечности для алгоритма кратчайшего пути (используется для недостижимых вершин).
-constexpr uint32_t kInfinity = std::numeric_limits<uint32_t>::max() / 4;
+constexpr uint32_t kInfinity = std::numeric_limits<uint32_t>::max() / 4; // делим на 4 для избежания переполнения при сложении в алгоритме Беллмана-Форда
 
 // Внутренняя структура для представления ребра графа.
 struct EdgeData {
@@ -119,8 +123,16 @@ ValidationResult validateGraph(const GraphDefinition& graph) {
         result.message = "Граф должен содержать не менее 6 вершин.";
         return result;
     }
+    if (graph.vertexCount > kMaxVertices) {
+        result.message = "Граф должен содержать не более 65536 вершин.";
+        return result;
+    }
     if (graph.edgeCount < kMinEdges) {
         result.message = "Граф должен содержать не менее 6 рёбер.";
+        return result;
+    }
+    if (graph.edgeCount > kMaxEdges) {
+        result.message = "Граф должен содержать не более 65536 рёбер.";
         return result;
     }
     if (graph.weights.size() != graph.edgeCount) {
