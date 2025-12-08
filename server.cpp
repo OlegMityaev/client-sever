@@ -30,20 +30,20 @@ struct ClientContext {
     bool hasGraph = false;
 };
 
-struct UdpClientKey {
-    std::string host;
-    uint16_t port = 0;
+// struct UdpClientKey {
+//     std::string host;
+//     uint16_t port = 0;
 
-    bool operator==(const UdpClientKey& other) const {
-        return host == other.host && port == other.port;
-    }
-};
+//     bool operator==(const UdpClientKey& other) const {
+//         return host == other.host && port == other.port;
+//     }
+// };
 
-struct UdpClientKeyHasher {
-    std::size_t operator()(const UdpClientKey& key) const noexcept {
-        return std::hash<std::string>()(key.host) ^ (std::hash<uint16_t>()(key.port) << 1);
-    }
-};
+// struct UdpClientKeyHasher {
+//     std::size_t operator()(const UdpClientKey& key) const noexcept {
+//         return std::hash<std::string>()(key.host) ^ (std::hash<uint16_t>()(key.port) << 1);
+//     }
+// };
 
 // Построение текста справки: возвращает строку с описанием доступных команд сервера.
 std::string buildHelpText() {

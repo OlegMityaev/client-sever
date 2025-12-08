@@ -10,14 +10,6 @@ namespace graph {
 
 namespace {
 
-// Минимальное количество вершин
-constexpr uint16_t kMinVertices = 6;
-// Минимальное количество рёбер
-constexpr uint16_t kMinEdges = 6;
-// Максимальное количество вершин
-constexpr uint16_t kMaxVertices = 65536;
-// Максимальное количество рёбер
-constexpr uint16_t kMaxEdges = 65536;
 // Значение бесконечности для алгоритма кратчайшего пути (используется для недостижимых вершин).
 constexpr uint32_t kInfinity = std::numeric_limits<uint32_t>::max() / 4; // делим на 4 для избежания переполнения при сложении в алгоритме Беллмана-Форда
 
@@ -27,44 +19,6 @@ struct EdgeData {
     uint16_t v;      // Конечная вершина
     uint32_t weight; // Вес ребра
 };
-
-// Проверка корректности матрицы инцидентности: проверяет размеры и структуру матрицы.
-// Каждый столбец должен содержать ровно 1 или 2 единицы (ребро соединяет 1 или 2 вершины).
-// В случае ошибки записывает описание в параметр message и возвращает false.
-bool checkIncidenceMatrix(const GraphDefinition& graph, std::string& message) {
-    if (graph.incidence.size() != graph.vertexCount) {
-        message = "Количество строк матрицы инцидентности не совпадает с числом вершин.";
-        return false;
-    }
-    for (const auto& row : graph.incidence) {
-        if (row.size() != graph.edgeCount) {
-            message = "Количество столбцов матрицы инцидентности не совпадает с числом рёбер.";
-            return false;
-        }
-    }
-    for (uint16_t e = 0; e < graph.edgeCount; ++e) {
-        uint16_t ones = 0;
-        for (uint16_t v = 0; v < graph.vertexCount; ++v) {
-            const int value = graph.incidence[v][e];
-            if (value != 0 && value != 1) {
-                message = "Матрица инцидентности должна содержать только 0 или 1.";
-                return false;
-            }
-            if (value == 1) {
-                ++ones;
-            }
-        }
-        if (ones == 0) {
-            message = "Каждое ребро должно быть инцидентно хотя бы одной вершине.";
-            return false;
-        }
-        if (ones > 2) {
-            message = "Ребро не может соединять более двух вершин.";
-            return false;
-        }
-    }
-    return true;
-}
 
 // Сборка списка рёбер из матрицы инцидентности: преобразует матрицу в список рёбер (u, v, weight).
 // Для каждого столбца матрицы находит инцидентные вершины и создаёт соответствующее ребро.
@@ -119,26 +73,6 @@ std::vector<EdgeData> collectEdges(const GraphDefinition& definition, std::strin
 ValidationResult validateGraph(const GraphDefinition& graph) {
     ValidationResult result;
 
-    if (graph.vertexCount < kMinVertices) {
-        result.message = "Граф должен содержать не менее 6 вершин.";
-        return result;
-    }
-    if (graph.vertexCount > kMaxVertices) {
-        result.message = "Граф должен содержать не более 65536 вершин.";
-        return result;
-    }
-    if (graph.edgeCount < kMinEdges) {
-        result.message = "Граф должен содержать не менее 6 рёбер.";
-        return result;
-    }
-    if (graph.edgeCount > kMaxEdges) {
-        result.message = "Граф должен содержать не более 65536 рёбер.";
-        return result;
-    }
-    if (graph.weights.size() != graph.edgeCount) {
-        result.message = "Количество весов должно равняться числу рёбер.";
-        return result;
-    }
     for (uint32_t weight : graph.weights) {
         if (weight > kInfinity) {
             result.message = "Вес ребра слишком велик.";
@@ -146,8 +80,30 @@ ValidationResult validateGraph(const GraphDefinition& graph) {
         }
     }
 
-    if (!checkIncidenceMatrix(graph, result.message)) {
-        return result;
+    std::string message;
+    for (uint16_t e = 0; e < graph.edgeCount; ++e) {
+        uint16_t ones = 0;
+        for (uint16_t v = 0; v < graph.vertexCount; ++v) {
+            const int value = graph.incidence[v][e];
+            if (value != 0 && value != 1) {
+                message = "Матрица инцидентности должна содержать только 0 или 1.";
+                result.message = message;
+                return result;
+            }
+            if (value == 1) {
+                ++ones;
+            }
+        }
+        if (ones < 2) {
+            message = "Каждое ребро должно быть инцидентно двум вершинам.";
+            result.message = message;
+            return result;
+        }
+        if (ones > 2) {
+            message = "Ребро не может соединять более двух вершин.";
+            result.message = message;
+            return result;
+        }
     }
 
     result.ok = true;
@@ -247,28 +203,28 @@ PathComputation bellmanFord(const GraphDefinition& graph, uint16_t source, uint1
     return result;
 }
 
-// Преобразование графа в список рёбер: создаёт список рёбер из матрицы инцидентности.
-// Также выполняет валидацию графа и записывает результат в параметр status.
-// Возвращает пустой список, если валидация не пройдена или произошла ошибка при сборке рёбер.
-std::vector<Edge> buildEdgeList(const GraphDefinition& graphDef, ValidationResult& status) {
-    status = validateGraph(graphDef);
-    if (!status.ok) {
-        return {};
-    }
-    std::string message;
-    std::vector<EdgeData> edges = collectEdges(graphDef, message);
-    if (!message.empty()) {
-        status.ok = false;
-        status.message = message;
-        return {};
-    }
-    std::vector<Edge> result;
-    result.reserve(edges.size());
-    for (const auto& e : edges) {
-        result.emplace_back(e.u, e.v, e.weight);
-    }
-    return result;
-}
+// // Преобразование графа в список рёбер: создаёт список рёбер из матрицы инцидентности.
+// // Также выполняет валидацию графа и записывает результат в параметр status.
+// // Возвращает пустой список, если валидация не пройдена или произошла ошибка при сборке рёбер.
+// std::vector<Edge> buildEdgeList(const GraphDefinition& graphDef, ValidationResult& status) {
+//     status = validateGraph(graphDef);
+//     if (!status.ok) {
+//         return {};
+//     }
+//     std::string message;
+//     std::vector<EdgeData> edges = collectEdges(graphDef, message);
+//     if (!message.empty()) {
+//         status.ok = false;
+//         status.message = message;
+//         return {};
+//     }
+//     std::vector<Edge> result;
+//     result.reserve(edges.size());
+//     for (const auto& e : edges) {
+//         result.emplace_back(e.u, e.v, e.weight);
+//     }
+//     return result;
+// }
 
 }  // namespace graph
 

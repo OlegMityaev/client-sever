@@ -42,12 +42,13 @@ ValidationResult validateGraph(const GraphDefinition& graph);
 // Возвращает PathComputation с информацией о пути от source до target.
 PathComputation bellmanFord(const GraphDefinition& graph, uint16_t source, uint16_t target);
 
+
 // Тип для представления ребра: (начальная вершина, конечная вершина, вес).
 using Edge = std::tuple<uint16_t, uint16_t, uint32_t>;
 
 // Преобразование графа в список рёбер для удобной обработки.
 // Также выполняет валидацию графа и записывает результат в параметр status.
-std::vector<Edge> buildEdgeList(const GraphDefinition& graph, ValidationResult& status);
+// std::vector<Edge> buildEdgeList(const GraphDefinition& graph, ValidationResult& status);
 
 }  // namespace graph
 

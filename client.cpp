@@ -22,7 +22,8 @@
 
 namespace {
 
-constexpr uint16_t kMaxVertices = 512;
+constexpr uint16_t kMaxVertices = 65535;
+constexpr uint16_t kMaxEdges = 65535;
 constexpr int kAckTimeoutSeconds = 3;
 constexpr int kAckRetries = 3;
 
@@ -64,14 +65,14 @@ void printLocalHelp() {
 // Формат: количество вершин, количество рёбер, матрица инцидентности (вершины x рёбра),
 // список весов рёбер. В случае ошибки записывает описание в параметр error и возвращает false.
 bool readGraphFromStream(std::istream& in, graph::GraphDefinition& graphDef, std::string& error) {
-    uint16_t vertices = 0;
-    uint16_t edges = 0;
+    uint32_t vertices = 0;
+    uint32_t edges = 0;
     if (!(in >> vertices >> edges)) {
         error = "Не удалось прочитать размеры графа.";
         return false;
     }
-    if (vertices == 0 || edges == 0 || vertices > kMaxVertices) {
-        error = "Неверные размеры графа (0 или превышает лимит).";
+    if (vertices < 6 || edges < 6 || vertices > kMaxVertices || edges > kMaxEdges) {
+        error = "Неверные размеры графа (меньше 6 или больше 65535).";
         return false;
     }
     
@@ -199,6 +200,28 @@ bool loadGraphFromFile(const std::string& path, graph::GraphDefinition& graphDef
     std::string error;
     if (!readGraphFromStream(file, graphDef, error)) {
         std::cerr << "Ошибка чтения файла: " << error << "\n";
+        return false;
+    }
+    return true;
+}
+
+// Простая проверка на стороне клиента: только размеры графа (количество вершин и рёбер).
+// Возвращает false и описание ошибки в параметре error, если проверка не пройдена.
+bool validateCounts(const graph::GraphDefinition& graphDef, std::string& error) {
+    if (graphDef.vertexCount < 6) {
+        error = "Граф должен содержать не менее 6 вершин.";
+        return false;
+    }
+    if (graphDef.vertexCount > kMaxVertices) {
+        error = "Граф должен содержать не более 65536 вершин.";
+        return false;
+    }
+    if (graphDef.edgeCount < 6) {
+        error = "Граф должен содержать не менее 6 рёбер.";
+        return false;
+    }
+    if (graphDef.edgeCount > kMaxEdges) {
+        error = "Граф должен содержать не более 65536 рёбер.";
         return false;
     }
     return true;
@@ -504,9 +527,9 @@ void runTcpClient(const ClientConfig& config) {
             if (!inputGraphFromConsole(graphDef)) {
                 continue;
             }
-            graph::ValidationResult validation = graph::validateGraph(graphDef);
-            if (!validation.ok) {
-                std::cerr << "Валидация не пройдена: " << validation.message << "\n";
+            std::string validationErr;
+            if (!validateCounts(graphDef, validationErr)) {
+                std::cerr << "Валидация не пройдена: " << validationErr << "\n";
                 continue;
             }
             std::vector<uint8_t> payload = buildUploadPayload(graphDef);
@@ -542,9 +565,9 @@ void runTcpClient(const ClientConfig& config) {
             if (!loadGraphFromFile(path, graphDef)) {
                 continue;
             }
-            graph::ValidationResult validation = graph::validateGraph(graphDef);
-            if (!validation.ok) {
-                std::cerr << "Валидация не пройдена: " << validation.message << "\n";
+            std::string validationErr;
+            if (!validateCounts(graphDef, validationErr)) {
+                std::cerr << "Валидация не пройдена: " << validationErr << "\n";
                 continue;
             }
             std::vector<uint8_t> payload = buildUploadPayload(graphDef);
@@ -668,9 +691,9 @@ void runUdpClient(const ClientConfig& config) {
             if (!inputGraphFromConsole(graphDef)) {
                 continue;
             }
-            graph::ValidationResult validation = graph::validateGraph(graphDef);
-            if (!validation.ok) {
-                std::cerr << "Валидация не пройдена: " << validation.message << "\n";
+            std::string validationErr;
+            if (!validateCounts(graphDef, validationErr)) {
+                std::cerr << "Валидация не пройдена: " << validationErr << "\n";
                 continue;
             }
             std::vector<uint8_t> payload = buildUploadPayload(graphDef);
@@ -701,9 +724,9 @@ void runUdpClient(const ClientConfig& config) {
             if (!loadGraphFromFile(path, graphDef)) {
                 continue;
             }
-            graph::ValidationResult validation = graph::validateGraph(graphDef);
-            if (!validation.ok) {
-                std::cerr << "Валидация не пройдена: " << validation.message << "\n";
+            std::string validationErr;
+            if (!validateCounts(graphDef, validationErr)) {
+                std::cerr << "Валидация не пройдена: " << validationErr << "\n";
                 continue;
             }
             std::vector<uint8_t> payload = buildUploadPayload(graphDef);
