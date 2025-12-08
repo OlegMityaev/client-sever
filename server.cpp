@@ -458,7 +458,7 @@ void runUdpServer(uint16_t port) {
                     break;
                 }
                 if (!context->hasGraph) {
-                    responsePayload = makeErrorPayload("Граф не загружен. Используйте upload_graph.", responseHeader);
+                    responsePayload = makeErrorPayload("Граф не загружен. Используйте load_graph.", responseHeader);
                     break;
                 }
                 graph::PathComputation computation = graph::bellmanFord(context->graph,
