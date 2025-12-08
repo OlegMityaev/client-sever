@@ -1,4 +1,3 @@
-// graph.cpp
 // Реализация проверки графа и поиска кратчайшего пути.
 
 #include "graph.hpp"
@@ -11,12 +10,16 @@ namespace graph {
 
 namespace {
 
-// Минимальное количество вершин в графе согласно требованиям.
+// Минимальное количество вершин
 constexpr uint16_t kMinVertices = 6;
-// Минимальное количество рёбер в графе согласно требованиям.
+// Минимальное количество рёбер
 constexpr uint16_t kMinEdges = 6;
-// Значение "бесконечности" для алгоритма кратчайшего пути (используется для недостижимых вершин).
-constexpr uint32_t kInfinity = std::numeric_limits<uint32_t>::max() / 4;
+// Максимальное количество вершин
+constexpr uint16_t kMaxVertices = 65536;
+// Максимальное количество рёбер
+constexpr uint16_t kMaxEdges = 65536;
+// Значение бесконечности для алгоритма кратчайшего пути (используется для недостижимых вершин).
+constexpr uint32_t kInfinity = std::numeric_limits<uint32_t>::max() / 4; // делим на 4 для избежания переполнения при сложении в алгоритме Беллмана-Форда
 
 // Внутренняя структура для представления ребра графа.
 struct EdgeData {
@@ -65,7 +68,7 @@ bool checkIncidenceMatrix(const GraphDefinition& graph, std::string& message) {
 
 // Сборка списка рёбер из матрицы инцидентности: преобразует матрицу в список рёбер (u, v, weight).
 // Для каждого столбца матрицы находит инцидентные вершины и создаёт соответствующее ребро.
-// Поддерживает петли (ребро, соединяющее вершину саму с собой).
+// Поддерживает петли
 // В случае ошибки записывает описание в параметр message и возвращает пустой список.
 std::vector<EdgeData> collectEdges(const GraphDefinition& definition, std::string& message) {
     std::vector<EdgeData> edges;
@@ -99,7 +102,6 @@ std::vector<EdgeData> collectEdges(const GraphDefinition& definition, std::strin
         }
 
         if (endpoints.size() == 1) {
-            // Петля: вершина соединена сама с собой.
             edges.push_back({endpoints[0], endpoints[0], weight});
         } else {
             edges.push_back({endpoints[0], endpoints[1], weight});
@@ -121,8 +123,16 @@ ValidationResult validateGraph(const GraphDefinition& graph) {
         result.message = "Граф должен содержать не менее 6 вершин.";
         return result;
     }
+    if (graph.vertexCount > kMaxVertices) {
+        result.message = "Граф должен содержать не более 65536 вершин.";
+        return result;
+    }
     if (graph.edgeCount < kMinEdges) {
         result.message = "Граф должен содержать не менее 6 рёбер.";
+        return result;
+    }
+    if (graph.edgeCount > kMaxEdges) {
+        result.message = "Граф должен содержать не более 65536 рёбер.";
         return result;
     }
     if (graph.weights.size() != graph.edgeCount) {

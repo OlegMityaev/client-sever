@@ -42,7 +42,7 @@ struct MessageHeader {
     uint32_t reserved;    // Зарезервированное поле для будущего использования
 };
 
-// Полезная нагрузка команды UploadGraph: содержит описание графа в компактном формате.
+// Полезная нагрузка команды UploadGraph: содержит описание графа
 struct UploadGraphPayload {
     uint16_t vertexCount;              // Количество вершин в графе
     uint16_t edgeCount;                // Количество рёбер в графе
@@ -52,8 +52,8 @@ struct UploadGraphPayload {
 
 // Полезная нагрузка команды PathQuery: запрос пути между двумя вершинами.
 struct PathQueryPayload {
-    uint16_t source; // Начальная вершина (нумерация с 0)
-    uint16_t target; // Конечная вершина (нумерация с 0)
+    uint16_t source; // Начальная вершина
+    uint16_t target; // Конечная вершина
 };
 
 // Полезная нагрузка ответа PathResult: результат поиска кратчайшего пути.
@@ -76,10 +76,10 @@ std::vector<uint8_t> serializeUploadGraph(const UploadGraphPayload& payload);
 // В случае ошибки записывает описание в параметр error.
 bool deserializeUploadGraph(const std::vector<uint8_t>& buffer, UploadGraphPayload& payload, std::string& error);
 
-// Сериализация полезной нагрузки PathQuery: упаковывает запрос пути в бинарный формат.
+// Сериализация PathQuery
 std::vector<uint8_t> serializePathQuery(const PathQueryPayload& payload);
 
-// Десериализация полезной нагрузки PathQuery: восстанавливает запрос пути из бинарного формата.
+// Десериализация PathQuery: восстанавливает запрос пути из бинарного формата.
 bool deserializePathQuery(const std::vector<uint8_t>& buffer, PathQueryPayload& payload);
 
 // Сериализация полезной нагрузки PathResult: упаковывает результат поиска пути в бинарный формат.

@@ -1,4 +1,3 @@
-// client.cpp
 // Клиентская часть приложения: ввод графа, формирование запросов и обмен с сервером по TCP/UDP.
 
 #include <arpa/inet.h>
@@ -53,7 +52,7 @@ struct ClientState {
 
 // Вывод краткой справки по командам клиента: показывает список доступных команд и их описание.
 void printLocalHelp() {
-    std::cout << "Доступные команды клиента:\n"
+    std::cout << "Доступные команды:\n"
                  "  help                - запросить список команд у сервера\n"
                  "  input               - ввести граф вручную\n"
                  "  load <путь>         - считать граф из файла\n"
@@ -484,8 +483,8 @@ void runTcpClient(const ClientConfig& config) {
     std::cout << "Подключено к TCP серверу " << config.ip << ":" << config.port << "\n";
     ClientState state;
 
-        while (true) {
-            std::cout << "> ";
+    while (true) {
+        std::cout << "> ";
         std::string line;
         if (!std::getline(std::cin, line)) {
             break;

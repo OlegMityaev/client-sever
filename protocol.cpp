@@ -1,4 +1,3 @@
-// protocol.cpp
 // Реализация функций сериализации и утилит сетевого протокола.
 
 #include "protocol.hpp"
@@ -133,7 +132,7 @@ bool deserializeUploadGraph(const std::vector<uint8_t>& buffer,
     if (!readBytes(buffer, offset, payload.vertexCount) ||
         !readBytes(buffer, offset, payload.edgeCount) ||
         !readBytes(buffer, offset, bitsSize)) {
-        error = "Корrupted payload header.";
+        error = "Заголовок поврежден.";
         return false;
     }
 
