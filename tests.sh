@@ -195,21 +195,37 @@ EOF
 cat << 'EOF' > test_udp_timeout.exp
 set timeout 12
 set port [lindex $argv 0]
+
 log_user 0
 
 spawn ./client 127.0.0.1 udp $port
 expect "> "
+
 puts "Ввод:             load valid_min_6.txt (Сервер выключен)"
-puts "Ожидаемый вывод:  Потеряна связь с сервером"
+puts "Ожидаемый вывод:  (Нет ответа, попытка 1)\n                  (Нет ответа, попытка 2)\n                  (Нет ответа, попытка 3)\n                  Потеряна связь с сервером."
 
 send "load valid_min_6.txt\r"
 expect {
-    "Потеряна связь с сервером" {
-        puts "Фактический вывод: Потеряна связь с сервером"
+    -re {\(Нет ответа, попытка 1\)[\s\S]*\(Нет ответа, попытка 2\)[\s\S]*\(Нет ответа, попытка 3\)[\s\S]*Потеряна связь с сервером} {
+        set output $expect_out(buffer)
+        regsub -all {\r} $output "" output
+        regsub -all {^\s+|\s+$} $output "" output
+        regsub -all {\n} $output "\n                  " output
+        puts "Фактический вывод: $output"
         exit 0
     }
     timeout {
-        puts "Фактический вывод: (TIMEOUT) Сообщение не появилось"
+        set output "(TIMEOUT) Сообщение не появилось или появилось не полностью."
+        if {[info exists expect_out(buffer)]} {
+            set received $expect_out(buffer)
+            regsub -all {\r} $received "" received
+            regsub -all {^\s+|\s+$} $received "" received
+            if {$received ne ""} {
+                regsub -all {\n} $received "\n                  " received
+                append output "\n                  (Получено: $received)"
+            }
+        }
+        puts "Фактический вывод: $output"
         exit 1
     }
 }
