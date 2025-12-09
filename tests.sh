@@ -123,7 +123,7 @@ set timeout 5
 set port [lindex $argv 0]
 set filename [lindex $argv 1]
 set cmd_input "load $filename"
-set expected_msg "Ошибка валидации (Неверное кол-во...)"
+set expected_msg "Неверное количество вершин: <полученное кол-во вершин>. Требуется от 6 до 65535."
 
 log_user 0
 
@@ -206,7 +206,7 @@ puts "Ожидаемый вывод:  (Нет ответа, попытка 1)\n 
 
 send "load valid_min_6.txt\r"
 expect {
-    -re {\(Нет ответа, попытка 1\)[\s\S]*\(Нет ответа, попытка 2\)[\s\S]*\(Нет ответа, попытка 3\)[\s\S]*Потеряна связь с сервером} {
+     -re {(?s)[(]Нет ответа, попытка 1[)].*[(]Нет ответа, попытка 2[)].*[(]Нет ответа, попытка 3[)].*Потеряна связь с сервером[.]} {
         set output $expect_out(buffer)
         regsub -all {\r} $output "" output
         regsub -all {^\s+|\s+$} $output "" output

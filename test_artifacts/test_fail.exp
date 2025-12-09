@@ -2,7 +2,7 @@ set timeout 5
 set port [lindex $argv 0]
 set filename [lindex $argv 1]
 set cmd_input "load $filename"
-set expected_msg "Ошибка валидации (Неверное кол-во...)"
+set expected_msg "Неверное количество вершин: 5. Требуется от 6 до 65535."
 
 log_user 0
 
