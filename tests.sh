@@ -232,7 +232,7 @@ run_test_block() {
         sleep 0.5
     fi
 
-    # Выполнение expect (он сам напечатает Ввод/Ожидание/Факт)
+    # Выполнение expect
     eval $CMD
     RET=$?
 
