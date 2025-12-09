@@ -503,6 +503,9 @@ std::optional<Transport> parseTransport(const std::string& protocol) {
 }  // namespace
 
 int main(int argc, char* argv[]) {
+    // Игнорируем сигнал SIGPIPE, чтобы сервер не падал при разрыве соединения
+    signal(SIGPIPE, SIG_IGN);
+    
     if (argc != 3) {
         std::cerr << "Использование: " << argv[0] << " <protocol> <port>\n";
         return 1;

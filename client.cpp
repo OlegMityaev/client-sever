@@ -71,8 +71,14 @@ bool readGraphFromStream(std::istream& in, graph::GraphDefinition& graphDef, std
         error = "Не удалось прочитать размеры графа.";
         return false;
     }
-    if (vertices < 6 || edges < 6 || vertices > kMaxVertices || edges > kMaxEdges) {
-        error = "Неверные размеры графа (меньше 6 или больше 65535).";
+    if (vertices < 6 || vertices > kMaxVertices) {
+        error = "Неверное количество вершин: " + std::to_string(vertices) + 
+                ". Требуется от 6 до " + std::to_string(kMaxVertices) + ".";
+        return false;
+    }
+    if (edges < 6 || edges > kMaxEdges) {
+        error = "Неверное количество рёбер: " + std::to_string(edges) + 
+                ". Требуется от 6 до " + std::to_string(kMaxEdges) + ".";
         return false;
     }
     

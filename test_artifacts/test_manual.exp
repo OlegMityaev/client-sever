@@ -1,0 +1,30 @@
+set timeout 5
+set port [lindex $argv 0]
+log_user 0
+
+spawn ./client 127.0.0.1 tcp $port
+expect "> "
+puts "Ввод:             input (матрица 6x6 вручную)"
+puts "Ожидаемый вывод:  Граф успешно загружен"
+
+send "input\r"
+expect "Введите данные:"
+send "6 6\r"
+send "1 0 0 0 0 1\r"
+send "1 1 0 0 0 0\r"
+send "0 1 1 0 0 0\r"
+send "0 0 1 1 0 0\r"
+send "0 0 0 1 1 0\r"
+send "0 0 0 0 1 1\r"
+send "1 1 1 1 1 1\r\r"
+
+expect {
+    "Граф успешно загружен" {
+        puts "Фактический вывод: Граф успешно загружен"
+        exit 0
+    }
+    timeout {
+        puts "Фактический вывод: (TIMEOUT) Клиент не ответил"
+        exit 1
+    }
+}

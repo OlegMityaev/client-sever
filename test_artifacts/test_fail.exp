@@ -1,0 +1,36 @@
+set timeout 5
+set port [lindex $argv 0]
+set filename [lindex $argv 1]
+set cmd_input "load $filename"
+set expected_msg "Ошибка валидации (Неверное кол-во...)"
+
+log_user 0
+
+spawn ./client 127.0.0.1 tcp $port
+expect "> "
+send "$cmd_input\r"
+
+puts "Ввод:             $cmd_input"
+puts "Ожидаемый вывод:  $expected_msg"
+
+expect {
+    -re "Неверное количество.*" {
+        # Выцепляем конкретное сообщение об ошибке
+        set full_buff $expect_out(buffer)
+        # Берем последнюю строку или часть с ошибкой
+        if {[regexp {Неверное количество [^\r\n]*} $full_buff match]} {
+             puts "Фактический вывод: $match"
+        } else {
+             puts "Фактический вывод: $full_buff"
+        }
+        exit 0
+    }
+    -re "Граф успешно загружен" {
+        puts "Фактический вывод: Граф успешно загружен (А должна быть ошибка!)"
+        exit 1
+    }
+    timeout {
+        puts "Фактический вывод: (TIMEOUT)"
+        exit 1
+    }
+}
