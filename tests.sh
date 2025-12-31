@@ -206,8 +206,8 @@ puts "Ожидаемый вывод:  (Нет ответа, попытка 1)\n 
 
 send "load valid_min_6.txt\r"
 expect {
-    -re {\(Нет ответа, попытка 1\)[\s\S]*\(Нет ответа, попытка 2\)[\s\S]*\(Нет ответа, попытка 3\)[\s\S]*Потеряна связь с сервером} {
-        set output $expect_out(buffer)
+    -re {(?s)[(]Нет ответа, попытка 1[)].*[(]Нет ответа, попытка 2[)].*[(]Нет ответа, попытка 3[)].*Потеряна связь с сервером[.]} {
+        set output $expect_out(0,string)
         regsub -all {\r} $output "" output
         regsub -all {^\s+|\s+$} $output "" output
         regsub -all {\n} $output "\n                  " output
