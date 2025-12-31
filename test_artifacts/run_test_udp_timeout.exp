@@ -1,0 +1,29 @@
+set timeout 12
+set port [lindex $argv 0]
+
+log_user 0
+
+proc print_res {input expected actual status} {
+    puts "   INPUT    : $input"
+    puts "   EXPECTED : $expected"
+    puts "   ACTUAL   : $actual"
+    if {$status == "PASS"} {
+        puts "   RESULT   : \033\[1;32m\[PASS\]\033\[0m"
+    } else {
+        puts "   RESULT   : \033\[1;31m\[FAIL\]\033\[0m"
+    }
+}
+
+spawn ./client 127.0.0.1 udp $port
+expect "> "
+send "load valid_small.txt\r"
+expect {
+     -re "Потеряна связь с сервером" { 
+        print_res "load valid_small.txt (Server OFF)" "Потеряна связь с сервером" "Потеряна связь с сервером" "PASS"
+        exit 0 
+     }
+     timeout { 
+        print_res "load valid_small.txt (Server OFF)" "Потеряна связь..." "TIMEOUT (клиент завис)" "FAIL"
+        exit 1 
+     }
+}

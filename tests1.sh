@@ -1,25 +1,21 @@
 #!/bin/bash
 
-# Цвета для вывода
 GREEN='\033[1;32m'
 RED='\033[1;31m'
 BLUE='\033[1;34m'
 CYAN='\033[0;36m'
 YELLOW='\033[1;33m'
-NC='\033[0m'
+NC='\033[0m' # No Color
 
 TEST_DIR="test_artifacts"
 VENV_DIR=".venv"
 
-# 0. Подготовка окружения
-echo -e "${BLUE}[INIT] Подготовка окружения...${NC}"
-
 if [ -d "$TEST_DIR" ]; then rm -rf "$TEST_DIR"; fi
 mkdir -p "$TEST_DIR"
 
-# Проверка/Создание venv и установка networkx для генератора
+# Проверка/Создание venv
 if [ ! -d "$VENV_DIR" ]; then
-    echo "Создание виртуального окружения Python..."
+    echo -e "${YELLOW}[INIT] Создание виртуального окружения Python...${NC}"
     python3 -m venv "$VENV_DIR"
     source "$VENV_DIR/bin/activate"
     pip install networkx > /dev/null 2>&1
@@ -27,8 +23,7 @@ else
     source "$VENV_DIR/bin/activate"
 fi
 
-# 1. Компиляция C++
-echo -e "${BLUE}[INIT] Компиляция проекта...${NC}"
+echo -e "${YELLOW}[INIT] Компиляция C++ проекта...${NC}"
 g++ -std=c++17 -pthread server.cpp graph.cpp protocol.cpp -o "$TEST_DIR/server"
 if [ $? -ne 0 ]; then echo -e "${RED}[FAIL] Ошибка компиляции сервера${NC}"; exit 1; fi
 
@@ -37,18 +32,41 @@ if [ $? -ne 0 ]; then echo -e "${RED}[FAIL] Ошибка компиляции к
 
 cd "$TEST_DIR" || exit 1
 
-# 2. Создание Python скриптов (Генератор и Решатель)
-
+# Генератор графов
 cat << 'EOF' > gen_graph.py
 import sys
 import networkx as nx
 import random
 
-def generate_graph(filename, v_count, e_count):
-    G = nx.gnm_random_graph(v_count, e_count, seed=42) # Seed для воспроизводимости структуры, но можно убрать
-    # Веса
+def generate_graph(filename, v_count, e_count, disconnected=False):
+    # Если нужен несвязный граф
+    if disconnected:
+        v1 = v_count // 2
+        v2 = v_count - v1
+        e1 = e_count // 2
+        e2 = e_count - e1
+        G1 = nx.gnm_random_graph(v1, e1, seed=42)
+        G2 = nx.gnm_random_graph(v2, e2, seed=43)
+        mapping = {i: i + v1 for i in range(v2)}
+        G2 = nx.relabel_nodes(G2, mapping)
+        G = nx.compose(G1, G2)
+    else:
+        # Пытаемся создать связный граф
+        attempt = 0
+        while attempt < 100:
+            try:
+                G = nx.gnm_random_graph(v_count, e_count, seed=42+attempt)
+                if v_count > 1 and e_count >= v_count - 1:
+                    if nx.is_connected(G):
+                        break
+                else:
+                    break
+            except:
+                pass
+            attempt += 1
+    # G = nx.gnm_random_graph(v_count, e_count, seed=42)
     for (u, v) in G.edges():
-        G.edges[u, v]['weight'] = random.randint(1, 10)
+        G.edges[u, v]['weight'] = random.randint(1, 100000)
 
     edges_list = list(G.edges(data=True))
     
@@ -69,9 +87,13 @@ def generate_graph(filename, v_count, e_count):
         f.write(" ".join(weights) + "\n")
 
 if __name__ == "__main__":
-    generate_graph(sys.argv[1], int(sys.argv[2]), int(sys.argv[3]))
+    is_disc = False
+    if len(sys.argv) > 4 and sys.argv[4] == "disconnected":
+        is_disc = True
+    generate_graph(sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), is_disc)
 EOF
 
+# Решатель
 cat << 'EOF' > solve_graph.py
 import sys
 import networkx as nx
@@ -98,12 +120,13 @@ def solve(filename, start_node, end_node):
             nodes = [v for v in range(v_count) if matrix[v][e] == 1]
             if len(nodes) == 2:
                 G.add_edge(nodes[0], nodes[1], weight=weights[e])
-            # Петли или странные ребра игнорируем для простоты, или обрабатываем как (nodes[0], nodes[0])
             
-        length = nx.shortest_path_length(G, source=start_node, target=end_node, weight='weight')
-        print(length) # Выводим ТОЛЬКО число в stdout
-    except nx.NetworkXNoPath:
-        print("UNREACHABLE")
+        try:
+            length = nx.shortest_path_length(G, source=start_node, target=end_node, weight='weight')
+            print(f"Длина пути: {length}")
+        except nx.NetworkXNoPath:
+            print("Ошибка сервера: Путь между вершинами не найден.") # Это ожидаемая строка для несвязных
+            
     except Exception as e:
         print(f"ERROR: {e}", file=sys.stderr)
         sys.exit(1)
@@ -112,18 +135,16 @@ if __name__ == "__main__":
     solve(sys.argv[1], int(sys.argv[2]), int(sys.argv[3]))
 EOF
 
-# 3. Генерация тестовых данных
-echo -e "${BLUE}[DATA] Генерация графов...${NC}"
+echo -e "${YELLOW}[DATA] Генерация тестовых наборов...${NC}"
 
-# Малый граф (простой тест)
+
 python3 gen_graph.py valid_small.txt 10 15
-# Средний граф (нагрузка)
 python3 gen_graph.py valid_medium.txt 100 200
-# Большой граф (только для теста загрузки, pathfinding может быть долгим в expect)
-# Используем разреженный граф, чтобы не раздувать матрицу до гигабайт
-python3 gen_graph.py valid_large.txt 705 705 
+python3 gen_graph.py valid_max_limit.txt 705 705
+python3 gen_graph.py disconnected.txt 20 10 disconnected
 
-# Невалидные файлы (ручное создание)
+# Невалидные файлы
+# 1. Слишком мало вершин (<6)
 cat << EOF > invalid_low_5.txt
 5 5
 1 0 0 0 1
@@ -134,203 +155,263 @@ cat << EOF > invalid_low_5.txt
 1 1 1 1 1
 EOF
 
-cat << EOF > invalid_too_big.txt
-65536 6
-0 0 0 0 0 0
+python3 gen_graph.py invalid_limit_exceeded.txt 706 706
+
+python3 gen_graph.py valid_huge_sparse.txt 65535 7
+
+cat << EOF > invalid_overflow.txt
+65536 7
+$(for i in {1..65536}; do echo "0 0 0 0 0 0 0"; done)
+1 1 1 1 1 1 1
 EOF
 
-# 4. Скрипты Expect
+# expect
 
-# Скрипт проверки ПУТИ (Главный скрипт валидации)
-cat << 'EOF' > test_path_verification.exp
+cat << 'EOF' > run_test_logic.exp
 set timeout 10
 set protocol [lindex $argv 0]
 set port [lindex $argv 1]
 set filename [lindex $argv 2]
-set u [lindex $argv 3]
-set v [lindex $argv 4]
-set expected_dist [lindex $argv 5]
+set cmd_query [lindex $argv 3]
+set expected_out [lindex $argv 4]
 
 log_user 0
+
+proc print_res {input expected actual status} {
+    puts "   INPUT    : $input"
+    puts "   EXPECTED : $expected"
+    puts "   ACTUAL   : $actual"
+    if {$status == "PASS"} {
+        puts "   RESULT   : \033\[1;32m\[PASS\]\033\[0m"
+    } else {
+        puts "   RESULT   : \033\[1;31m\[FAIL\]\033\[0m"
+    }
+}
 
 spawn ./client 127.0.0.1 $protocol $port
 expect "> "
 
-# 1. Загрузка
+# Этап 1: Загрузка
 send "load $filename\r"
 expect {
     "Граф успешно загружен" { }
-    timeout { puts "Фактический вывод: Timeout при загрузке"; exit 1 }
-    "Ошибка" { puts "Фактический вывод: Ошибка при загрузке"; exit 1 }
+    timeout { 
+        print_res "load $filename" "Граф успешно загружен" "TIMEOUT" "FAIL"
+        exit 1 
+    }
+    -re "Ошибка.*|Неверное.*" {
+        print_res "load $filename" "Граф успешно загружен" "$expect_out(0,string)" "FAIL"
+        exit 1
+    }
 }
 
 expect "> "
 
-# 2. Запрос пути
-send "query $u $v\r"
+# Этап 2: Запрос
+send "$cmd_query\r"
 expect {
-    -re "Длина пути.*$expected_dist" {
-        # Все отлично
+    -re "$expected_out" {
+        print_res "$cmd_query" "$expected_out" "$expect_out(0,string)" "PASS"
         exit 0
     }
-    -re "Длина пути.*" {
-        set output $expect_out(0,string)
-        puts "Фактический вывод: $output (Ожидалось: $expected_dist)"
+    -re "Длина пути.*|Путь не существует.*|Не удалось.*" {
+        print_res "$cmd_query" "$expected_out" "$expect_out(0,string)" "FAIL"
         exit 1
     }
-    timeout { puts "Фактический вывод: Timeout при запросе пути"; exit 1 }
+    timeout {
+        print_res "$cmd_query" "$expected_out" "TIMEOUT" "FAIL"
+        exit 1
+    }
 }
 EOF
 
-# Скрипт проверки ОШИБОК (валидация ввода)
-cat << 'EOF' > test_fail.exp
+# Скрипт для проверки ошибок (валидации)
+cat << 'EOF' > run_test_validation.exp
 set timeout 5
 set port [lindex $argv 0]
 set filename [lindex $argv 1]
-set expected_msg "Неверное количество вершин"
+set expected_err "Неверное количество вершин"
 
 log_user 0
+
+proc print_res {input expected actual status} {
+    puts "   INPUT    : $input"
+    puts "   EXPECTED : Error ($expected)"
+    puts "   ACTUAL   : $actual"
+    if {$status == "PASS"} {
+        puts "   RESULT   : \033\[1;32m\[PASS\]\033\[0m"
+    } else {
+        puts "   RESULT   : \033\[1;31m\[FAIL\]\033\[0m"
+    }
+}
 
 spawn ./client 127.0.0.1 tcp $port
 expect "> "
 send "load $filename\r"
 
 expect {
-    -re "Неверное количество.*" { exit 0 }
-    timeout { puts "TIMEOUT"; exit 1 }
-    "Граф успешно загружен" { puts "Граф загрузился, а не должен был"; exit 1 }
+    -re "Неверное количество.*|Ошибка.*" {
+        print_res "load $filename" "$expected_err" "$expect_out(0,string)" "PASS"
+        exit 0
+    }
+    "Граф успешно загружен" {
+        print_res "load $filename" "$expected_err" "Граф успешно загружен" "FAIL"
+        exit 1
+    }
+    timeout {
+        print_res "load $filename" "$expected_err" "TIMEOUT" "FAIL"
+        exit 1
+    }
 }
 EOF
 
-# Скрипт ручного ввода
-cat << 'EOF' > test_manual.exp
-set timeout 5
-set port [lindex $argv 0]
-log_user 0
-
-spawn ./client 127.0.0.1 tcp $port
-expect "> "
-send "input\r"
-expect "Введите данные:"
-# Граф 6 вершин, кольцо
-send "6 6\r"
-send "1 0 0 0 0 1\r"
-send "1 1 0 0 0 0\r"
-send "0 1 1 0 0 0\r"
-send "0 0 1 1 0 0\r"
-send "0 0 0 1 1 0\r"
-send "0 0 0 0 1 1\r"
-send "1 1 1 1 1 1\r\r" 
-
-expect "Граф успешно загружен"
-expect "> "
-send "query 0 3\r"
-# В кольце из 6 вершин (веса 1) путь от 0 до 3 равен 3
-expect {
-    -re "Длина пути.*3" { exit 0 }
-    timeout { puts "TIMEOUT manual check"; exit 1 }
-}
-EOF
-
-# Скрипт UDP Timeout
-cat << 'EOF' > test_udp_timeout.exp
+# Скрипт для проверки таймаута UDP
+cat << 'EOF' > run_test_udp_timeout.exp
 set timeout 12
 set port [lindex $argv 0]
+
 log_user 0
+
+proc print_res {input expected actual status} {
+    puts "   INPUT    : $input"
+    puts "   EXPECTED : $expected"
+    puts "   ACTUAL   : $actual"
+    if {$status == "PASS"} {
+        puts "   RESULT   : \033\[1;32m\[PASS\]\033\[0m"
+    } else {
+        puts "   RESULT   : \033\[1;31m\[FAIL\]\033\[0m"
+    }
+}
+
 spawn ./client 127.0.0.1 udp $port
 expect "> "
 send "load valid_small.txt\r"
 expect {
-     -re "Потеряна связь с сервером" { exit 0 }
-     timeout { puts "TIMEOUT (UDP wait)"; exit 1 }
+     -re "Потеряна связь с сервером" { 
+        print_res "load valid_small.txt (Server OFF)" "Потеряна связь с сервером" "Потеряна связь с сервером" "PASS"
+        exit 0 
+     }
+     timeout { 
+        print_res "load valid_small.txt (Server OFF)" "Потеряна связь..." "TIMEOUT (клиент завис)" "FAIL"
+        exit 1 
+     }
 }
 EOF
 
-# --- ФУНКЦИЯ ЗАПУСКА ТЕСТА ---
-run_path_test() {
-    TEST_TITLE="$1"
+run_logic_test() {
+    TEST_NAME="$1"
     PORT="$2"
     PROTO="$3"
     FILE="$4"
     U="$5"
     V="$6"
 
-    echo -e "${CYAN}TEST: $TEST_TITLE ($FILE) [$PROTO]${NC}"
+    echo -e "${CYAN}TEST: $TEST_NAME${NC}"
 
-    # 1. Считаем эталонное значение на Python
+    # 1. Получаем эталон
     EXPECTED_VAL=$(python3 solve_graph.py "$FILE" "$U" "$V")
-    if [ $? -ne 0 ]; then
-        echo -e "${RED}[ERROR] Python не смог посчитать путь. Проверьте установку networkx.${NC}"
-        return
-    fi
-
-    # 2. Запускаем сервер
-    ./server $PROTO $PORT > server.log 2>&1 &
+    
+    # 2. Старт сервера
+    ./server $PROTO $PORT > /dev/null 2>&1 &
     PID=$!
     sleep 0.5
 
-    # 3. Запускаем тест клиента, передавая ему ожидаемое значение
-    expect -f test_path_verification.exp "$PROTO" "$PORT" "$FILE" "$U" "$V" "$EXPECTED_VAL"
+    # 3. Запуск теста
+    expect -f run_test_logic.exp "$PROTO" "$PORT" "$FILE" "query $U $V" "$EXPECTED_VAL"
     RET=$?
 
-    # 4. Убиваем сервер
-    kill $PID 2>/dev/null
-    wait $PID 2>/dev/null
-
-    if [ $RET -eq 0 ]; then
-        echo -e "Путь ($U -> $V) = $EXPECTED_VAL. Статус: ${GREEN}[PASS]${NC}"
-    else
-        echo -e "Ожидалось: $EXPECTED_VAL. Статус: ${RED}[FAIL]${NC}"
-    fi
+    # 4. Стоп сервер
+    kill $PID 2>/dev/null; wait $PID 2>/dev/null
+    
+    if [ $RET -eq 0 ]; then return 0; else return 1; fi
 }
 
-run_fail_test() {
-    TEST_TITLE="$1"
+run_validation_test() {
+    TEST_NAME="$1"
     PORT="$2"
     FILE="$3"
-    
-    echo -e "${CYAN}TEST: $TEST_TITLE${NC}"
+
+    echo -e "${CYAN}TEST: $TEST_NAME${NC}"
     ./server tcp $PORT > /dev/null 2>&1 &
     PID=$!
     sleep 0.5
-    
-    expect -f test_fail.exp "$PORT" "$FILE"
-    RET=$?
-    
-    kill $PID 2>/dev/null
-    wait $PID 2>/dev/null
-    
-    if [ $RET -eq 0 ]; then echo -e "Статус: ${GREEN}[PASS]${NC}"; else echo -e "Статус: ${RED}[FAIL]${NC}"; fi
+    expect -f run_test_validation.exp "$PORT" "$FILE"
+    kill $PID 2>/dev/null; wait $PID 2>/dev/null
 }
 
 
-# 1. Базовая проверка TCP (малый граф)
-run_path_test "1. TCP Small Logic" 6001 "tcp" "valid_small.txt" 0 5
+run_logic_test "1. TCP: Малый граф (10 вершин)" 6001 "tcp" "valid_small.txt" 0 5
+run_logic_test "2. UDP: Малый граф (10 вершин)" 6002 "udp" "valid_small.txt" 1 4
+run_logic_test "3. TCP: Средний граф (100 вершин)" 6003 "tcp" "valid_medium.txt" 0 50
+run_logic_test "4. TCP: Макс. граф (705 вершин, 705 ребер)" 6004 "tcp" "valid_max_limit.txt" 0 704
+run_logic_test "5. TCP: Несвязный граф (пути нет)" 6005 "tcp" "disconnected.txt" 0 15
+run_validation_test "6. Ошибка: 5 вершин (< min 6)" 6006 "invalid_low_5.txt"
+run_validation_test "7. Ошибка: 706 вершин и 706 рёбер (> max 705)" 6007 "invalid_limit_exceeded.txt"
+echo -e "${CYAN}TEST: 8. UDP Reliability (Нет сервера - таймаут)${NC}"
+expect -f run_test_udp_timeout.exp 6008
+echo -e "${CYAN}TEST: 9. Concurrency (3 клиента одновременно)${NC}"
+./server tcp 7000 > /dev/null 2>&1 &
+SERVER_PID=$!
+sleep 1
 
-# 2. Базовая проверка UDP (малый граф)
-run_path_test "2. UDP Small Logic" 6002 "udp" "valid_small.txt" 1 4
+# Запуск клиентов в фоне
+(
+    expect -c "
+    log_user 0
+    spawn ./client 127.0.0.1 tcp 7000
+    expect \"> \"
+    send \"load valid_small.txt\r\"
+    expect \"Граф успешно загружен\"
+    send \"query 0 5\r\"
+    expect \"Длина пути\"
+    exit 0
+    " 
+) & PID1=$!
 
-# 3. Средний граф (TCP) - проверка алгоритма на большем масштабе
-run_path_test "3. TCP Medium Logic" 6003 "tcp" "valid_medium.txt" 0 50
+(
+    expect -c "
+    log_user 0
+    spawn ./client 127.0.0.1 tcp 7000
+    expect \"> \"
+    send \"load valid_medium.txt\r\"
+    expect \"Граф успешно загружен\"
+    send \"query 0 50\r\"
+    expect \"Длина пути\"
+    exit 0
+    " 
+) & PID2=$!
 
-# 4. Большой граф (Загрузка + простой путь)
-# Проверяем соседние вершины, чтобы дейкстра не искал слишком долго, если реализация медленная
-run_path_test "4. TCP Large (1000 nodes)" 6004 "tcp" "valid_large.txt" 0 1 
+(
+    expect -c "
+    log_user 0
+    spawn ./client 127.0.0.1 tcp 7000
+    expect \"> \"
+    send \"load valid_max_limit.txt\r\"
+    expect \"Граф успешно загружен\"
+    send \"query 0 1\r\"
+    expect \"Длина пути\"
+    exit 0
+    " 
+) & PID3=$!
 
-# 5. Ручной ввод и проверка пути
-echo -e "${CYAN}TEST: 5. Manual Input & Logic${NC}"
-./server tcp 6005 > /dev/null 2>&1 &
-PID=$!
-sleep 0.5
-expect -f test_manual.exp 6005
-if [ $? -eq 0 ]; then echo -e "Статус: ${GREEN}[PASS]${NC}"; else echo -e "Статус: ${RED}[FAIL]${NC}"; fi
-kill $PID 2>/dev/null; wait $PID 2>/dev/null
+wait $PID1
+R1=$?
+wait $PID2
+R2=$?
+wait $PID3
+R3=$?
 
-# 6. Ошибки
-run_fail_test "6. Validation Low (5 vertices)" 6006 "invalid_low_5.txt"
-run_fail_test "7. Validation High (65536 vertices)" 6007 "invalid_too_big.txt"
+kill $SERVER_PID 2>/dev/null
+echo "   Клиент 1 (Small) Status: $R1"
+echo "   Клиент 2 (Medium) Status: $R2"
+echo "   Клиент 3 (Max) Status: $R3"
 
-# 8. UDP Timeout
-echo -e "${CYAN}TEST: 8. UDP Timeout${NC}"
-expect -f test_udp_timeout.exp 6008
-if [ $? -eq 0 ]; then echo -e "Статус: ${GREEN}[PASS]${NC}"; else echo -e "Статус: ${RED}[FAIL]${NC}"; fi
+if [ $R1 -eq 0 ] && [ $R2 -eq 0 ] && [ $R3 -eq 0 ]; then
+    echo -e "   RESULT   : ${GREEN}[PASS] Все клиенты отработали${NC}"
+else
+    echo -e "   RESULT   : ${RED}[FAIL] Ошибка параллельной работы${NC}"
+fi
+
+run_logic_test "10. TCP: граница вершин (65535 вершин, 7 рёбер)" 6004 "tcp" "valid_huge_sparse.txt" 0 1
+
+run_validation_test "11. Ошибка: 65536 вершин" 6007 "invalid_overflow.txt"

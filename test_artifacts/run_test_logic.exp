@@ -1,0 +1,55 @@
+set timeout 10
+set protocol [lindex $argv 0]
+set port [lindex $argv 1]
+set filename [lindex $argv 2]
+set cmd_query [lindex $argv 3]
+set expected_out [lindex $argv 4]
+
+log_user 0
+
+proc print_res {input expected actual status} {
+    puts "   INPUT    : $input"
+    puts "   EXPECTED : $expected"
+    puts "   ACTUAL   : $actual"
+    if {$status == "PASS"} {
+        puts "   RESULT   : \033\[1;32m\[PASS\]\033\[0m"
+    } else {
+        puts "   RESULT   : \033\[1;31m\[FAIL\]\033\[0m"
+    }
+}
+
+spawn ./client 127.0.0.1 $protocol $port
+expect "> "
+
+# Этап 1: Загрузка
+send "load $filename\r"
+expect {
+    "Граф успешно загружен" { }
+    timeout { 
+        print_res "load $filename" "Граф успешно загружен" "TIMEOUT" "FAIL"
+        exit 1 
+    }
+    -re "Ошибка.*|Неверное.*" {
+        print_res "load $filename" "Граф успешно загружен" "$expect_out(0,string)" "FAIL"
+        exit 1
+    }
+}
+
+expect "> "
+
+# Этап 2: Запрос
+send "$cmd_query\r"
+expect {
+    -re "$expected_out" {
+        print_res "$cmd_query" "$expected_out" "$expect_out(0,string)" "PASS"
+        exit 0
+    }
+    -re "Длина пути.*|Путь не существует.*|Не удалось.*" {
+        print_res "$cmd_query" "$expected_out" "$expect_out(0,string)" "FAIL"
+        exit 1
+    }
+    timeout {
+        print_res "$cmd_query" "$expected_out" "TIMEOUT" "FAIL"
+        exit 1
+    }
+}

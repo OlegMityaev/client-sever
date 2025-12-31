@@ -203,29 +203,6 @@ PathComputation bellmanFord(const GraphDefinition& graph, uint16_t source, uint1
     return result;
 }
 
-// // Преобразование графа в список рёбер: создаёт список рёбер из матрицы инцидентности.
-// // Также выполняет валидацию графа и записывает результат в параметр status.
-// // Возвращает пустой список, если валидация не пройдена или произошла ошибка при сборке рёбер.
-// std::vector<Edge> buildEdgeList(const GraphDefinition& graphDef, ValidationResult& status) {
-//     status = validateGraph(graphDef);
-//     if (!status.ok) {
-//         return {};
-//     }
-//     std::string message;
-//     std::vector<EdgeData> edges = collectEdges(graphDef, message);
-//     if (!message.empty()) {
-//         status.ok = false;
-//         status.message = message;
-//         return {};
-//     }
-//     std::vector<Edge> result;
-//     result.reserve(edges.size());
-//     for (const auto& e : edges) {
-//         result.emplace_back(e.u, e.v, e.weight);
-//     }
-//     return result;
-// }
-
 }  // namespace graph
 
 

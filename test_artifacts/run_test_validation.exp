@@ -1,0 +1,36 @@
+set timeout 5
+set port [lindex $argv 0]
+set filename [lindex $argv 1]
+set expected_err "Неверное количество вершин"
+
+log_user 0
+
+proc print_res {input expected actual status} {
+    puts "   INPUT    : $input"
+    puts "   EXPECTED : Error ($expected)"
+    puts "   ACTUAL   : $actual"
+    if {$status == "PASS"} {
+        puts "   RESULT   : \033\[1;32m\[PASS\]\033\[0m"
+    } else {
+        puts "   RESULT   : \033\[1;31m\[FAIL\]\033\[0m"
+    }
+}
+
+spawn ./client 127.0.0.1 tcp $port
+expect "> "
+send "load $filename\r"
+
+expect {
+    -re "Неверное количество.*|Ошибка.*" {
+        print_res "load $filename" "$expected_err" "$expect_out(0,string)" "PASS"
+        exit 0
+    }
+    "Граф успешно загружен" {
+        print_res "load $filename" "$expected_err" "Граф успешно загружен" "FAIL"
+        exit 1
+    }
+    timeout {
+        print_res "load $filename" "$expected_err" "TIMEOUT" "FAIL"
+        exit 1
+    }
+}

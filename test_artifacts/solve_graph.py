@@ -23,12 +23,13 @@ def solve(filename, start_node, end_node):
             nodes = [v for v in range(v_count) if matrix[v][e] == 1]
             if len(nodes) == 2:
                 G.add_edge(nodes[0], nodes[1], weight=weights[e])
-            # Петли или странные ребра игнорируем для простоты, или обрабатываем как (nodes[0], nodes[0])
             
-        length = nx.shortest_path_length(G, source=start_node, target=end_node, weight='weight')
-        print(length) # Выводим ТОЛЬКО число в stdout
-    except nx.NetworkXNoPath:
-        print("UNREACHABLE")
+        try:
+            length = nx.shortest_path_length(G, source=start_node, target=end_node, weight='weight')
+            print(f"Длина пути: {length}")
+        except nx.NetworkXNoPath:
+            print("Ошибка сервера: Путь между вершинами не найден.") # Это ожидаемая строка для несвязных
+            
     except Exception as e:
         print(f"ERROR: {e}", file=sys.stderr)
         sys.exit(1)
