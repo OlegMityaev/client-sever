@@ -1,5 +1,3 @@
-// Реализация проверки графа и поиска кратчайшего пути.
-
 #include "graph.hpp"
 
 #include <algorithm>
