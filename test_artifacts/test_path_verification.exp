@@ -1,0 +1,37 @@
+set timeout 10
+set protocol [lindex $argv 0]
+set port [lindex $argv 1]
+set filename [lindex $argv 2]
+set u [lindex $argv 3]
+set v [lindex $argv 4]
+set expected_dist [lindex $argv 5]
+
+log_user 0
+
+spawn ./client 127.0.0.1 $protocol $port
+expect "> "
+
+# 1. Загрузка
+send "load $filename\r"
+expect {
+    "Граф успешно загружен" { }
+    timeout { puts "Фактический вывод: Timeout при загрузке"; exit 1 }
+    "Ошибка" { puts "Фактический вывод: Ошибка при загрузке"; exit 1 }
+}
+
+expect "> "
+
+# 2. Запрос пути
+send "query $u $v\r"
+expect {
+    -re "Длина пути.*$expected_dist" {
+        # Все отлично
+        exit 0
+    }
+    -re "Длина пути.*" {
+        set output $expect_out(0,string)
+        puts "Фактический вывод: $output (Ожидалось: $expected_dist)"
+        exit 1
+    }
+    timeout { puts "Фактический вывод: Timeout при запросе пути"; exit 1 }
+}

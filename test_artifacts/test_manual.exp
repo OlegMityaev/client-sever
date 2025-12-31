@@ -4,11 +4,9 @@ log_user 0
 
 spawn ./client 127.0.0.1 tcp $port
 expect "> "
-puts "Ввод:             input (матрица 6x6 вручную)"
-puts "Ожидаемый вывод:  Граф успешно загружен"
-
 send "input\r"
 expect "Введите данные:"
+# Граф 6 вершин, кольцо
 send "6 6\r"
 send "1 0 0 0 0 1\r"
 send "1 1 0 0 0 0\r"
@@ -16,15 +14,13 @@ send "0 1 1 0 0 0\r"
 send "0 0 1 1 0 0\r"
 send "0 0 0 1 1 0\r"
 send "0 0 0 0 1 1\r"
-send "1 1 1 1 1 1\r\r"
+send "1 1 1 1 1 1\r\r" 
 
+expect "Граф успешно загружен"
+expect "> "
+send "query 0 3\r"
+# В кольце из 6 вершин (веса 1) путь от 0 до 3 равен 3
 expect {
-    "Граф успешно загружен" {
-        puts "Фактический вывод: Граф успешно загружен"
-        exit 0
-    }
-    timeout {
-        puts "Фактический вывод: (TIMEOUT) Клиент не ответил"
-        exit 1
-    }
+    -re "Длина пути.*3" { exit 0 }
+    timeout { puts "TIMEOUT manual check"; exit 1 }
 }
