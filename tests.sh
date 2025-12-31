@@ -98,7 +98,7 @@ expect {
         expect "> "
         send "query 0 1\r"
         expect {
-            "Длина пути" { exit 0 } # PASS
+            "Длина пути 2" # PASS
             timeout { puts "Фактический вывод (Query): Timeout"; exit 1 }
         }
     }
@@ -123,7 +123,7 @@ set timeout 5
 set port [lindex $argv 0]
 set filename [lindex $argv 1]
 set cmd_input "load $filename"
-set expected_msg "Ошибка валидации (Неверное кол-во...)"
+set expected_msg "Неверное количество вершин: <полученное кол-во вершин>. Требуется от 6 до 65535."
 
 log_user 0
 
@@ -201,7 +201,7 @@ log_user 0
 spawn ./client 127.0.0.1 udp $port
 expect "> "
 
-puts "Ввод:             load valid_min_6.txt (Сервер выключен)"
+puts "Ввод:             load valid_min_6.txt (Сvервер выключен)"
 puts "Ожидаемый вывод:  (Нет ответа, попытка 1)\n                  (Нет ответа, попытка 2)\n                  (Нет ответа, попытка 3)\n                  Потеряна связь с сервером."
 
 send "load valid_min_6.txt\r"
@@ -248,7 +248,7 @@ run_test_block() {
         sleep 0.5
     fi
 
-    # Выполнение expect (он сам напечатает Ввод/Ожидание/Факт)
+    # Выполнение expect
     eval $CMD
     RET=$?
 
@@ -268,33 +268,25 @@ run_test_block() {
 
 
 # 1. TCP Min
-run_test_block "1. TCP: Валидный граф (6 вершин)" 5001 \
-    "expect -f test_success.exp tcp 5001 valid_min_6.txt" "tcp"
+run_test_block "1. TCP: Валидный граф (6 вершин)" 5001 "expect -f test_success.exp tcp 5001 valid_min_6.txt" "tcp"
 
 # 2. UDP Min
-run_test_block "2. UDP: Валидный граф (6 вершин)" 5002 \
-    "expect -f test_success.exp udp 5002 valid_min_6.txt" "udp"
+run_test_block "2. UDP: Валидный граф (6 вершин)" 5002 "expect -f test_success.exp udp 5002 valid_min_6.txt" "udp"
 
 # 3. Middle Graph
-run_test_block "3. TCP: Средний граф (30000 вершин)" 5003 \
-    "expect -f test_success.exp tcp 5003 valid_middle_30k.txt" "tcp"
+run_test_block "3. TCP: Средний граф (30000 вершин)" 5003 "expect -f test_success.exp tcp 5003 valid_middle_30k.txt" "tcp"
 
 # 4. Max Graph (65535)
-run_test_block "4. TCP: Максимальный граф (65535 вершин)" 5004 \
-    "expect -f test_success.exp tcp 5004 valid_max_huge.txt" "tcp"
+run_test_block "4. TCP: Максимальный граф (65535 вершин)" 5004 "expect -f test_success.exp tcp 5004 valid_max_huge.txt" "tcp"
 
 # 5. Ручной ввод
-run_test_block "5. Ручной ввод через консоль" 5005 \
-    "expect -f test_manual.exp 5005" "tcp"
+run_test_block "5. Ручной ввод через консоль" 5005 "expect -f test_manual.exp 5005" "tcp"
 
 # 6. Ошибка (Min - 1)
-run_test_block "6. Валидация: 5 вершин (Нижняя граница)" 5006 \
-    "expect -f test_fail.exp 5006 invalid_low_5.txt" "tcp"
+run_test_block "6. Валидация: 5 вершин (Нижняя граница)" 5006 "expect -f test_fail.exp 5006 invalid_low_5.txt" "tcp"
 
 # 7. Ошибка (Max + 1)
-run_test_block "7. Валидация: 65536 вершин (Верхняя граница)" 5007 \
-    "expect -f test_fail.exp 5007 invalid_too_big.txt" "tcp"
+run_test_block "7. Валидация: 65536 вершин (Верхняя граница)" 5007 "expect -f test_fail.exp 5007 invalid_too_big.txt" "tcp"
 
 # 8. UDP Timeout
-run_test_block "8. UDP: Проверка таймаута (Сервер недоступен)" 5008 \
-    "expect -f test_udp_timeout.exp 5008" "NONE"
+run_test_block "8. UDP: Проверка таймаута (Сервер недоступен)" 5008 "expect -f test_udp_timeout.exp 5008" "NONE"

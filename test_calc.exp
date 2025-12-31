@@ -1,0 +1,109 @@
+#!/usr/bin/expect -f
+
+set timeout 10
+set protocol [lindex $argv 0]
+set port [lindex $argv 1]
+set testfile [lindex $argv 2]
+
+# Отключаем вывод взаимодействия (можно включить для отладки)
+log_user 0
+
+puts "Протокол: $protocol"
+puts "Порт: $port"
+puts "Тестовый файл: $testfile"
+
+# Запускаем клиент
+spawn ./client 127.0.0.1 $protocol $port
+
+# Ждем приветственное сообщение и список команд
+expect {
+    timeout {
+        puts "ОШИБКА: Таймаут при запуске клиента"
+        exit 1
+    }
+    "Доступные команды:" {
+        puts "Вывод: доступные команды"
+    }
+}
+
+# Прокручиваем вывод до промпта
+expect {
+    timeout {
+        puts "ОШИБКА: Таймаут при ожидании промпта"
+        exit 1
+    }
+    "> " {
+        puts "> появился"
+    }
+}
+
+set cmd "load $testfile"
+puts "Ввод: $cmd"
+
+send "$cmd\r"
+
+expect {
+    timeout {
+        puts "ОШИБКА: Таймаут при загрузке графа"
+        exit 1
+    }
+    -re "Граф успешно загружен на сервер.*Граф принят сервером." {
+        puts "Граф успешно загружен на сервер"
+    }
+    "Ошибка" {
+        puts "ОШИБКА: Не удалось загрузить граф"
+        puts "Вывод: $expect_out(buffer)"
+        exit 1
+    }
+}
+
+expect {
+    timeout {
+        puts "ОШИБКА: Таймаут после загрузки графа"
+        exit 1
+    }
+    "> " {
+        # Продолжаем тест
+    }
+}
+
+set cmd "query 0 5"
+puts "Ввод: $cmd"
+
+send "$cmd\r"
+
+expect {
+    timeout {
+        puts "ОШИБКА: Таймаут при запросе пути"
+        exit 1
+    }
+    -re "Длина пути: 6.*Путь: 0 -> 5" {
+        puts "Путь найден корректно"
+        puts "Вывод:"
+        puts "Длина пути: 6"
+        puts "Путь: 0 -> 5"
+    }
+    -re "Длина пути: (\\d+)" {
+        set actual_len $expect_out(1,string)
+        puts "ОШИБКА: Неверная длина пути. Ожидалось: 6, Получено: $actual_len"
+        exit 1
+    }
+    "Ошибка" {
+        puts "ОШИБКА: Не удалось найти путь"
+        puts "Вывод: $expect_out(buffer)"
+        exit 1
+    }
+}
+
+send "exit\r"
+
+expect {
+    timeout {
+        puts "Клиент завершил работу"
+    }
+    eof {
+        puts "Клиент завершил работу (EOF)"
+    }
+}
+
+exit 0

@@ -1,20 +1,10 @@
 set timeout 12
 set port [lindex $argv 0]
 log_user 0
-
 spawn ./client 127.0.0.1 udp $port
 expect "> "
-puts "Ввод:             load valid_min_6.txt (Сервер выключен)"
-puts "Ожидаемый вывод:  Потеряна связь с сервером"
-
-send "load valid_min_6.txt\r"
+send "load valid_small.txt\r"
 expect {
-    "Потеряна связь с сервером" {
-        puts "Фактический вывод: Потеряна связь с сервером"
-        exit 0
-    }
-    timeout {
-        puts "Фактический вывод: (TIMEOUT) Сообщение не появилось"
-        exit 1
-    }
+     -re "Потеряна связь с сервером" { exit 0 }
+     timeout { puts "TIMEOUT (UDP wait)"; exit 1 }
 }
