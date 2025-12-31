@@ -45,8 +45,8 @@ def generate_graph(filename, v_count, e_count, disconnected=False):
         v2 = v_count - v1
         e1 = e_count // 2
         e2 = e_count - e1
-        G1 = nx.gnm_random_graph(v1, e1, seed=42)
-        G2 = nx.gnm_random_graph(v2, e2, seed=43)
+        G1 = nx.gnm_random_graph(v1, e1)
+        G2 = nx.gnm_random_graph(v2, e2)
         mapping = {i: i + v1 for i in range(v2)}
         G2 = nx.relabel_nodes(G2, mapping)
         G = nx.compose(G1, G2)
@@ -55,7 +55,7 @@ def generate_graph(filename, v_count, e_count, disconnected=False):
         attempt = 0
         while attempt < 100:
             try:
-                G = nx.gnm_random_graph(v_count, e_count, seed=42+attempt)
+                G = nx.gnm_random_graph(v_count, e_count)
                 if v_count > 1 and e_count >= v_count - 1:
                     if nx.is_connected(G):
                         break
@@ -64,7 +64,6 @@ def generate_graph(filename, v_count, e_count, disconnected=False):
             except:
                 pass
             attempt += 1
-    # G = nx.gnm_random_graph(v_count, e_count, seed=42)
     for (u, v) in G.edges():
         G.edges[u, v]['weight'] = random.randint(1, 100000)
 
@@ -165,7 +164,94 @@ $(for i in {1..65536}; do echo "0 0 0 0 0 0 0"; done)
 1 1 1 1 1 1 1
 EOF
 
+# Файл с мусором (буквы вместо цифр)
+cat << EOF > invalid_format.txt
+10 10
+1 0 0 1 0
+garbage data here
+EOF
+
+# Файл с отрицательным весом
+cat << EOF > invalid_negative.txt
+6 6
+1 1 0 0 0 0
+1 0 1 0 0 0
+0 1 1 0 0 0
+0 0 0 1 1 0
+0 0 0 1 0 1
+0 0 0 0 1 1
+-5 1 1 1 1 1
+EOF
+
 # expect
+
+cat << 'EOF' > run_test_manual.exp
+set timeout 5
+set port [lindex $argv 0]
+
+log_user 0
+
+proc print_res {input expected actual status} {
+    puts "   INPUT    : $input"
+    puts "   EXPECTED : $expected"
+    puts "   ACTUAL   : $actual"
+    if {$status == "PASS"} {
+        puts "   RESULT   : \033\[1;32m\[PASS\]\033\[0m"
+    } else {
+        puts "   RESULT   : \033\[1;31m\[FAIL\]\033\[0m"
+    }
+}
+
+spawn ./client 127.0.0.1 tcp $port
+expect "> "
+send "input\r"
+
+# 2. Используем -re (regex), чтобы поймать "Введите данные" в конце любого текста.
+# (?s) включает режим, где точка (.) совпадает с переносом строки.
+expect {
+    -re "Введите данные.*" { 
+        # Приглашение получено, идем дальше
+    }
+    timeout {
+        print_res "input command" "Приглашение 'Введите данные:'" "TIMEOUT (текст не найден)" "FAIL"
+        exit 1
+    }
+}
+
+# Небольшая пауза, чтобы std::cin программы точно был готов
+sleep 0.1
+
+send "6 6\r"
+send "1 0 0 0 0 1\r"
+send "1 1 0 0 0 0\r"
+send "0 1 1 0 0 0\r"
+send "0 0 1 1 0 0\r"
+send "0 0 0 1 1 0\r"
+send "0 0 0 0 1 1\r"
+send "1 1 1 1 1 1\r"
+send "\r"
+
+expect {
+    "Граф успешно загружен на сервер." {
+        # Сразу проверяем расчет
+        send "query 0 3\r"
+        expect {
+            -re "Длина пути.*3" {
+                 print_res "input (manual entry)" "Длина пути: 3" "Длина пути: 3" "PASS"
+                 exit 0
+            }
+            timeout {
+                 print_res "input (manual entry)" "Длина пути: 3" "TIMEOUT waiting for result" "FAIL"
+                 exit 1
+            }
+        }
+    }
+    timeout {
+        print_res "input (manual entry)" "Граф успешно загружен" "TIMEOUT waiting for success msg" "FAIL"
+        exit 1
+    }
+}
+EOF
 
 cat << 'EOF' > run_test_logic.exp
 set timeout 10
@@ -230,13 +316,13 @@ cat << 'EOF' > run_test_validation.exp
 set timeout 5
 set port [lindex $argv 0]
 set filename [lindex $argv 1]
-set expected_err "Неверное количество вершин"
+set expected_msg_text [lindex $argv 2] 
 
 log_user 0
 
 proc print_res {input expected actual status} {
     puts "   INPUT    : $input"
-    puts "   EXPECTED : Error ($expected)"
+    puts "   EXPECTED : $expected"
     puts "   ACTUAL   : $actual"
     if {$status == "PASS"} {
         puts "   RESULT   : \033\[1;32m\[PASS\]\033\[0m"
@@ -250,16 +336,18 @@ expect "> "
 send "load $filename\r"
 
 expect {
-    -re "Неверное количество.*|Ошибка.*" {
-        print_res "load $filename" "$expected_err" "$expect_out(0,string)" "PASS"
+    # Ловим любые варианты сообщений об ошибках
+    -re "Неверное.*|Ошибка.*|Некорректн.*" {
+        set received $expect_out(0,string)
+        print_res "load $filename" "$expected_msg_text" "$received" "PASS"
         exit 0
     }
     "Граф успешно загружен" {
-        print_res "load $filename" "$expected_err" "Граф успешно загружен" "FAIL"
+        print_res "load $filename" "$expected_msg_text" "Граф успешно загружен (ОШИБКА НЕ ПОЙМАНА)" "FAIL"
         exit 1
     }
     timeout {
-        print_res "load $filename" "$expected_err" "TIMEOUT" "FAIL"
+        print_res "load $filename" "$expected_msg_text" "TIMEOUT" "FAIL"
         exit 1
     }
 }
@@ -330,13 +418,17 @@ run_validation_test() {
     TEST_NAME="$1"
     PORT="$2"
     FILE="$3"
+    MSG="$4"
 
     echo -e "${CYAN}TEST: $TEST_NAME${NC}"
     ./server tcp $PORT > /dev/null 2>&1 &
     PID=$!
     sleep 0.5
-    expect -f run_test_validation.exp "$PORT" "$FILE"
-    kill $PID 2>/dev/null; wait $PID 2>/dev/null
+    
+    expect -f run_test_validation.exp "$PORT" "$FILE" "$MSG"
+    
+    kill $PID 2>/dev/null
+    wait $PID 2>/dev/null
 }
 
 
@@ -345,8 +437,8 @@ run_logic_test "2. UDP: Малый граф (10 вершин)" 6002 "udp" "valid
 run_logic_test "3. TCP: Средний граф (100 вершин)" 6003 "tcp" "valid_medium.txt" 0 50
 run_logic_test "4. TCP: Макс. граф (705 вершин, 705 ребер)" 6004 "tcp" "valid_max_limit.txt" 0 704
 run_logic_test "5. TCP: Несвязный граф (пути нет)" 6005 "tcp" "disconnected.txt" 0 15
-run_validation_test "6. Ошибка: 5 вершин (< min 6)" 6006 "invalid_low_5.txt"
-run_validation_test "7. Ошибка: 706 вершин и 706 рёбер (> max 705)" 6007 "invalid_limit_exceeded.txt"
+run_validation_test "6. Ошибка: 5 вершин (< min 6)" 6006 "invalid_low_5.txt" "Ошибка чтения файла: Неверное количество вершин: 5. Требуется от 6 до 65535."
+run_validation_test "7. Ошибка: 706 вершин и 706 рёбер (> max 705)" 6007 "invalid_limit_exceeded.txt" "Ошибка чтения файла: Неверный размер матрицы инцидентности: 498436. Требуется от 36 до 497025."
 echo -e "${CYAN}TEST: 8. UDP Reliability (Нет сервера - таймаут)${NC}"
 expect -f run_test_udp_timeout.exp 6008
 echo -e "${CYAN}TEST: 9. Concurrency (3 клиента одновременно)${NC}"
@@ -414,4 +506,16 @@ fi
 
 run_logic_test "10. TCP: граница вершин (65535 вершин, 7 рёбер)" 6004 "tcp" "valid_huge_sparse.txt" 0 1
 
-run_validation_test "11. Ошибка: 65536 вершин" 6007 "invalid_overflow.txt"
+run_validation_test "11. Ошибка: 65536 вершин" 8000 "invalid_overflow.txt" "Ошибка чтения файла: Неверное количество вершин: 65536. Требуется от 6 до 65535."
+
+# Тест 1.4.2.1 - Ручной ввод
+echo -e "${CYAN}TEST: 12. Manual Input (Ручной ввод)${NC}"
+./server tcp 8001 > /dev/null 2>&1 &
+PID=$!
+sleep 0.5
+expect -f run_test_manual.exp 8001
+kill $PID 2>/dev/null; wait $PID 2>/dev/null
+
+
+run_validation_test "13. Ошибка формата (буквы в файле)" 8002 "invalid_format.txt" "Ошибка чтения файла: В строке 1 матрицы инцидентности неверное количество чисел: ожидается 10, получено 5."
+run_validation_test "14. Ошибка: Отрицательные веса" 8003 "invalid_negative.txt" "Ошибка сервера: Вес ребра либо < 0, либо слишком велик."

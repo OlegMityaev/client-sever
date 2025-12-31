@@ -9,8 +9,8 @@ def generate_graph(filename, v_count, e_count, disconnected=False):
         v2 = v_count - v1
         e1 = e_count // 2
         e2 = e_count - e1
-        G1 = nx.gnm_random_graph(v1, e1, seed=42)
-        G2 = nx.gnm_random_graph(v2, e2, seed=43)
+        G1 = nx.gnm_random_graph(v1, e1)
+        G2 = nx.gnm_random_graph(v2, e2)
         mapping = {i: i + v1 for i in range(v2)}
         G2 = nx.relabel_nodes(G2, mapping)
         G = nx.compose(G1, G2)
@@ -19,7 +19,7 @@ def generate_graph(filename, v_count, e_count, disconnected=False):
         attempt = 0
         while attempt < 100:
             try:
-                G = nx.gnm_random_graph(v_count, e_count, seed=42+attempt)
+                G = nx.gnm_random_graph(v_count, e_count)
                 if v_count > 1 and e_count >= v_count - 1:
                     if nx.is_connected(G):
                         break
@@ -28,7 +28,6 @@ def generate_graph(filename, v_count, e_count, disconnected=False):
             except:
                 pass
             attempt += 1
-    # G = nx.gnm_random_graph(v_count, e_count, seed=42)
     for (u, v) in G.edges():
         G.edges[u, v]['weight'] = random.randint(1, 100000)
 

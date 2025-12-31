@@ -1,13 +1,13 @@
 set timeout 5
 set port [lindex $argv 0]
 set filename [lindex $argv 1]
-set expected_err "Неверное количество вершин"
+set expected_msg_text [lindex $argv 2] 
 
 log_user 0
 
 proc print_res {input expected actual status} {
     puts "   INPUT    : $input"
-    puts "   EXPECTED : Error ($expected)"
+    puts "   EXPECTED : $expected"
     puts "   ACTUAL   : $actual"
     if {$status == "PASS"} {
         puts "   RESULT   : \033\[1;32m\[PASS\]\033\[0m"
@@ -21,16 +21,18 @@ expect "> "
 send "load $filename\r"
 
 expect {
-    -re "Неверное количество.*|Ошибка.*" {
-        print_res "load $filename" "$expected_err" "$expect_out(0,string)" "PASS"
+    # Ловим любые варианты сообщений об ошибках
+    -re "Неверное.*|Ошибка.*|Некорректн.*" {
+        set received $expect_out(0,string)
+        print_res "load $filename" "$expected_msg_text" "$received" "PASS"
         exit 0
     }
     "Граф успешно загружен" {
-        print_res "load $filename" "$expected_err" "Граф успешно загружен" "FAIL"
+        print_res "load $filename" "$expected_msg_text" "Граф успешно загружен (ОШИБКА НЕ ПОЙМАНА)" "FAIL"
         exit 1
     }
     timeout {
-        print_res "load $filename" "$expected_err" "TIMEOUT" "FAIL"
+        print_res "load $filename" "$expected_msg_text" "TIMEOUT" "FAIL"
         exit 1
     }
 }

@@ -65,7 +65,6 @@ std::vector<EdgeData> collectEdges(const GraphDefinition& definition, std::strin
 }  // namespace
 
 // Валидация графа: проверяет соответствие графа всем требованиям.
-// Проверяет: минимальное количество вершин (>= 6), минимальное количество рёбер (>= 6),
 // соответствие размеров матрицы, корректность матрицы инцидентности, неотрицательность весов.
 // Возвращает ValidationResult с результатом проверки.
 ValidationResult validateGraph(const GraphDefinition& graph) {
@@ -73,7 +72,7 @@ ValidationResult validateGraph(const GraphDefinition& graph) {
 
     for (uint32_t weight : graph.weights) {
         if (weight > kInfinity) {
-            result.message = "Вес ребра слишком велик.";
+            result.message = "Вес ребра либо < 0, либо слишком велик.";
             return result;
         }
     }

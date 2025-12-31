@@ -1,0 +1,65 @@
+set timeout 5
+set port [lindex $argv 0]
+
+log_user 0
+
+proc print_res {input expected actual status} {
+    puts "   INPUT    : $input"
+    puts "   EXPECTED : $expected"
+    puts "   ACTUAL   : $actual"
+    if {$status == "PASS"} {
+        puts "   RESULT   : \033\[1;32m\[PASS\]\033\[0m"
+    } else {
+        puts "   RESULT   : \033\[1;31m\[FAIL\]\033\[0m"
+    }
+}
+
+spawn ./client 127.0.0.1 tcp $port
+expect "> "
+send "input\r"
+
+# 2. Используем -re (regex), чтобы поймать "Введите данные" в конце любого текста.
+# (?s) включает режим, где точка (.) совпадает с переносом строки.
+expect {
+    -re "Введите данные.*" { 
+        # Приглашение получено, идем дальше
+    }
+    timeout {
+        print_res "input command" "Приглашение 'Введите данные:'" "TIMEOUT (текст не найден)" "FAIL"
+        exit 1
+    }
+}
+
+# Небольшая пауза, чтобы std::cin программы точно был готов
+sleep 0.1
+
+send "6 6\r"
+send "1 0 0 0 0 1\r"
+send "1 1 0 0 0 0\r"
+send "0 1 1 0 0 0\r"
+send "0 0 1 1 0 0\r"
+send "0 0 0 1 1 0\r"
+send "0 0 0 0 1 1\r"
+send "1 1 1 1 1 1\r"
+send "\r"
+
+expect {
+    "Граф успешно загружен на сервер." {
+        # Сразу проверяем расчет
+        send "query 0 3\r"
+        expect {
+            -re "Длина пути.*3" {
+                 print_res "input (manual entry)" "Длина пути: 3" "Длина пути: 3" "PASS"
+                 exit 0
+            }
+            timeout {
+                 print_res "input (manual entry)" "Длина пути: 3" "TIMEOUT waiting for result" "FAIL"
+                 exit 1
+            }
+        }
+    }
+    timeout {
+        print_res "input (manual entry)" "Граф успешно загружен" "TIMEOUT waiting for success msg" "FAIL"
+        exit 1
+    }
+}
